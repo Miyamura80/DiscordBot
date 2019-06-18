@@ -1,0 +1,8 @@
+#neglects all text files
+*.txt
+
+#Ignore files in the folder
+IgnoreFiles/
+
+#Ignore specific file
+token.txt
