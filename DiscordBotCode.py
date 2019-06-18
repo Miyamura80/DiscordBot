@@ -245,11 +245,11 @@ async def version(context):
                 description="Prints version of code",
                 aliases=["eito","ninoh"])
 async def eito(context):
+    print(context.author.id)
     if context.author.id=="270972813739819009":
         await context.send("You are my owner")
     else:
         await context.send("You are not Eito")
-
 
 async def list_servers():
     await client.wait_until_ready()
