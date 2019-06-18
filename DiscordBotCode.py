@@ -345,6 +345,12 @@ async def commands(ctx):
     embed.add_field(name="➤Settings", value="None atm", inline=True)
     await ctx.send(embed=embed)
 
+
+@client.command()
+async def source(ctx):
+    await ctx.send("https://github.com/Miyamura80/DiscordBot")
+
+
 async def list_servers():
     await client.wait_until_ready()
     while not client.is_closed:
