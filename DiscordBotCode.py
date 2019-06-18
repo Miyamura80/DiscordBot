@@ -239,7 +239,7 @@ async def echo(context,*,arg):
                 description="Prints version of code",
                 aliases=["v","ver","version"])
 async def version(context):
-    await context.send("Version Number: v.1.0.1")
+    await context.send("Version Number: v.1.0.2")
 
 @client.command(name="Eito",
                 description="Prints version of code",
