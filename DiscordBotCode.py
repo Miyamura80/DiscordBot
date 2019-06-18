@@ -18,7 +18,7 @@ import aiohttp
 import json
 from random import randint
 from discord.ext import commands
-from discord import Game,Member
+from discord import Game,Member,Embed,Colour
 from discord.ext.commands import Bot
 import time
 
@@ -296,6 +296,22 @@ async def myRole(context):
             if i!=len(roleList)-1:
                 roles += ", "
         await context.send(roles)
+
+@client.command()
+async def showEmbed(ctx):
+    embed = Embed(
+        title="Here's a kewl title",
+        description="This is a description baby",
+        colour= Colour.blue()
+
+    )
+    embed.set_footer(text="this is a footer")
+    embed.set_image(url="https://i.ytimg.com/vi/ezs7S9a_bNI/maxresdefault.jpg")
+    embed.set_thumbnail(url="https://assets3.thrillist.com/v1/image/2813543/size/gn-gift_guide_variable_c.jpg")
+    embed.set_author(name="Eimi",icon_url="https://vignette.wikia.nocookie.net/vocaloid/images/8/85/Eve_icon1.jpg/revision/latest?cb=20180618163614")
+    embed.add_field(name="Field Name",value="Field value",inline=True)
+    embed.add_field(name="Field Name", value="Field value", inline=False)
+    await ctx.send(embed=embed)
 
 async def list_servers():
     await client.wait_until_ready()
