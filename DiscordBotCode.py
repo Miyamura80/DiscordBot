@@ -18,7 +18,7 @@ import aiohttp
 import json
 from random import randint
 from discord.ext import commands
-from discord import Game,User
+from discord import Game,Member
 from discord.ext.commands import Bot
 import time
 
@@ -128,11 +128,42 @@ async def slap(ctx, *, reason: RandomSlapper):
 
 
 @client.command(pass_context=True)
-@commands.has_permissions(kick_members=True)
-async def kick(ctx, member: User):
-    """ Simple kick command """
-    await client.kick(member)
-    print("kicked" + " " + str(member))
+async def kick(ctx, member: Member,reason="<None Specified>"):
+    if "454184393636839426" in [str(role.id) for role in ctx.author.roles]:
+        await ctx.send("**Kicked**: "+str(member.name)+" for: "+reason)
+        await member.kick(reason=reason)
+    else:
+        await ctx.send("Insufficient permissions")
+
+@client.command(pass_context=True)
+async def ban(ctx, member: Member,reason="<None Specified>"):
+    if "454184393636839426" in [str(role.id) for role in ctx.author.roles]:
+        await ctx.send("**Banned**: "+str(member.name)+" for: "+reason)
+        await member.ban(reason=reason)
+    else:
+        await ctx.send("Insufficient permissions")
+
+@client.command(name='banList',
+                brief="Shows a list of banned users",
+                aliases=['bl', 'banlist', 'BanList'])
+async def banList(ctx):
+    banned_users = await ctx.guild.bans()
+    banList = "**Banned Users:**\n"
+    for ban_Entry in banned_users:
+        user = ban_Entry.user
+        banList += user.name + "#" +user.discriminator + "\n"
+    await ctx.send(banList)
+
+@client.command()
+async def unban(ctx,member):
+    banned_users = await ctx.guild.bans()
+    memberName,memberDiscriminator = member.split("#")
+    for ban_entry  in banned_users:
+        user = ban_entry.user
+        if (user.name,user.discriminator) == (memberName,memberDiscriminator):
+            await ctx.guild.unban(user)
+            await ctx.send(f"**Unbanned user**: {user.mention}")
+            return
 
 
 @client.command(name='8ball',
@@ -246,14 +277,18 @@ async def eito(context):
 
 @client.command(name="MyRole",
                 description="Prints out role of a user",
-                aliases=["myRole","mr","MyRole"])
+                aliases=["myRole","myr","myrole"])
 async def myRole(context):
-    if "454184393636839426" in [str(role.id) for role in context.author.roles]:
-        await context.send("You are admin")
-    elif "590446933840232459" in [str(role.id) for role in context.author.roles]:
-        await context.send("You are a human")
-    else:
+    roleList = [str(role.name) for role in context.author.roles][1:]
+    if len(roleList)==0:
         await context.send("You do not have a role")
+    else:
+        roles = ""
+        for i in range(len(roleList)):
+            roles += roleList[i]
+            if i!=len(roleList)-1:
+                roles += ", "
+        await context.send(roles)
 
 async def list_servers():
     await client.wait_until_ready()
