@@ -141,7 +141,7 @@ async def kick(ctx, member: User):
     print("kicked" + " " + str(member))
 
 
-
+#
 @client.command(name='8ball',
                 description="Answers a yes/no question.",
                 brief="Answers from the beyond.",
