@@ -245,7 +245,7 @@ async def version(context):
                 description="Prints version of code",
                 aliases=["eito","ninoh"])
 async def eito(context):
-    print(context.author.id,"Eito's Id: 270972813739819009")
+    await context.send(context.author.id,"Eito's Id: 270972813739819009")
     if context.author.id=="270972813739819009":
         await context.send("You are my owner")
     else:
