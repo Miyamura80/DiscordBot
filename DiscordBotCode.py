@@ -127,7 +127,7 @@ async def slap(ctx, *, reason: RandomSlapper):
 
 
 
-@client.command(pass_context=True)
+@client.command(pass_context=True,category="Moderation")
 async def kick(ctx, member: Member,reason="<None Specified>"):
     if "454184393636839426" in [str(role.id) for role in ctx.author.roles]:
         await ctx.send("**Kicked**: "+str(member.name)+" for: "+reason)
@@ -135,7 +135,7 @@ async def kick(ctx, member: Member,reason="<None Specified>"):
     else:
         await ctx.send("Insufficient permissions")
 
-@client.command(pass_context=True)
+@client.command(pass_context=True,category="Moderation")
 async def ban(ctx, member: Member,reason="<None Specified>"):
     if "454184393636839426" in [str(role.id) for role in ctx.author.roles]:
         await ctx.send("**Banned**: "+str(member.name)+" for: "+reason)
@@ -145,7 +145,7 @@ async def ban(ctx, member: Member,reason="<None Specified>"):
 
 @client.command(name='banList',
                 brief="Shows a list of banned users",
-                aliases=['bl', 'banlist', 'BanList'])
+                aliases=['bl', 'banlist', 'BanList'],category="Moderation")
 async def banList(ctx):
     banned_users = await ctx.guild.bans()
     banList = "**Banned Users:**\n"
@@ -154,7 +154,7 @@ async def banList(ctx):
         banList += user.name + "#" +user.discriminator + "\n"
     await ctx.send(banList)
 
-@client.command()
+@client.command(category="Moderation")
 async def unban(ctx,member):
     banned_users = await ctx.guild.bans()
     memberName,memberDiscriminator = member.split("#")
@@ -165,6 +165,13 @@ async def unban(ctx,member):
             await ctx.send("**Unbanned user**: {}".format(user.mention))
             return
 
+@client.command(category="Moderation")
+async def clear(ctx,num=100):
+    channel = ctx.guild.channel
+    messages = []
+    async for message in client.logs_from(channel,limit=int(num)):
+        messages.append(message)
+    await client.delete_messages(messages)
 
 @client.command(name='8ball',
                 description="Answers a yes/no question.",
