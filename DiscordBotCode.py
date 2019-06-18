@@ -235,7 +235,11 @@ async def echo(context,*,arg):
     await context.send(arg)
 
 
-
+@client.command(name="Version",
+                description="Prints version of code",
+                aliases=["v","ver","version"])
+async def version(context):
+    await context.send("Version Number: v.1.0.1")
 
 
 async def list_servers():
