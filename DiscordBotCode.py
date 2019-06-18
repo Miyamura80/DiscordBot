@@ -229,7 +229,7 @@ async def chess(context,arg: toUpper):
         for i in range(len(CHESSHELP)):
             await context.send(CHESSHELP[i])
 
-@client.command(name="regional_indicator",
+@client.command(name="EmojiWrite",
                 description="Prints out words",
                 aliases=["emojiWrite","regIn","emw"])
 async def emojiWrite(context,word):
@@ -311,6 +311,38 @@ async def showEmbed(ctx):
     embed.set_author(name="Eimi",icon_url="https://vignette.wikia.nocookie.net/vocaloid/images/8/85/Eve_icon1.jpg/revision/latest?cb=20180618163614")
     embed.add_field(name="Field Name",value="Field value",inline=True)
     embed.add_field(name="Field Name", value="Field value", inline=False)
+    await ctx.send(embed=embed)
+
+@client.command()
+async def botInfo(ctx):
+    embed = Embed(
+        title="Lappy",
+        description="Bot built to manage your server and have fun",
+        colour=Colour.blue()
+    )
+    embed.set_footer(text="Lappy is a digital construction of Eimi's PC as a bot")
+    embed.set_thumbnail(url="https://i.ytimg.com/vi/ezs7S9a_bNI/maxresdefault.jpg")
+    embed.add_field(name="Owner", value="Eimi#8826", inline=True)
+    embed.add_field(name="Version", value="1.6.0", inline=True)
+    embed.add_field(name="Language", value="Python", inline=True)
+    embed.add_field(name="Commands", value="x number", inline=True)
+    embed.add_field(name="Hosting", value="Raspberry Pi 2 B at my house", inline=True)
+    await ctx.send(embed=embed)
+
+@client.command()
+async def commands(ctx):
+    embed = Embed(
+        title="__**Commands**__",
+        description="All commands are executed with prefix `!` (e.g. `!botinfo`)",
+        colour=Colour.blue()
+    )
+    embed.set_footer(text="Lappy is a digital construction of Eimi's PC as a bot")
+    embed.set_thumbnail(url="https://i.ytimg.com/vi/ezs7S9a_bNI/maxresdefault.jpg")
+    embed.add_field(name="➤Info", value="`!botinfo`", inline=False)
+    embed.add_field(name="➤Utility", value="`!emw`", inline=False)
+    embed.add_field(name="➤Games", value="`!minesweeper`", inline=False)
+    embed.add_field(name="➤Moderation", value="`!kick`,`!ban`,`!unban`,`!banlist`", inline=False)
+    embed.add_field(name="➤Settings", value="None atm", inline=True)
     await ctx.send(embed=embed)
 
 async def list_servers():
