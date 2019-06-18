@@ -1,10 +1,4 @@
-# # Work with Python 3.6
-# import discord
-#
-# TOKEN = 'XXXXXXXXXX'
-#
-# client = discord.Client()
-#
+
 # @client.event
 # async def on_message(message):
 #     # we do not want the bot to reply to itself
@@ -245,12 +239,21 @@ async def version(context):
                 description="Prints version of code",
                 aliases=["eito","ninoh"])
 async def eito(context):
-    await context.send(type(context.author.id))
-    await context.send(context.author.id+"Eito's Id: 270972813739819009")
-    if context.author.id=="270972813739819009":
+    if str(context.author.id)=="270972813739819009":
         await context.send("You are my owner")
     else:
         await context.send("You are not Eito")
+
+@client.command(name="MyRole",
+                description="Prints out role of a user",
+                aliases=["myRole","mr","MyRole"])
+async def myRole(context):
+    if "454184393636839426" in [str(role.id) for role in context.author.roles]:
+        await context.send("You are admin")
+    elif "590446933840232459" in [str(role.id) for role in context.author.roles]:
+        await context.send("You are a human")
+    else:
+        await context.send("You do not have a role")
 
 async def list_servers():
     await client.wait_until_ready()
@@ -260,7 +263,7 @@ async def list_servers():
             print(server.name)
         await asyncio.sleep(600)
 
-print("hello")
+
 
 client.loop.create_task(list_servers())
 
