@@ -3,10 +3,13 @@ import asyncio
 import aiohttp
 import json
 from random import randint
-from discord.ext import commands
+from discord.ext import commands,tasks
 from discord import Game,Member,Embed,Colour,errors
 from discord.ext.commands import Bot
+from itertools import cycle
 import time
+import discord
+
 
 CHESSHELP = ["!c XN>YM: X for column N for row, to column Y row M",
              "!c newgame: start a new game for 2 player",
@@ -30,6 +33,10 @@ CHESSCODE = {"BR":"♜","BK":"♞","BB":"♝","BQ":"♛","BG":"♚","BP":"♟",
 with open("chatFilterList.txt","r") as f:
     bannedWordsPrepro =f.readlines()
 bannedWords = [word.lower() for word in bannedWordsPrepro]
+
+statusCycle = cycle(["with Ninoh's tasks","with server managament",
+                     "with minesweeper puzzles","Echo","Music players"
+                     ,"Your soul"])
 
 
 def toUpper(arg):
@@ -102,7 +109,7 @@ def putNumbers(n,M):
 BOT_PREFIX = ("?", "!")
 
 client = Bot(command_prefix=BOT_PREFIX)
-
+# client.remove_command("help")
 
 
 
@@ -167,13 +174,10 @@ async def unban(ctx,member):
         await ctx.send("Insufficient permissions")
 
 @client.command(category="Moderation",pass_context=True)
-async def clear(ctx,num=100):
+async def clear(ctx,num=5):
+    num += 1
     if ctx.message.author.guild_permissions.administrator:
-        channel = ctx.channel
-        messages = []
-        async for message in ctx.logs_from(channel,limit=int(num)):
-            messages.append(message)
-        await ctx.delete_messages(messages)
+        await ctx.channel.purge(limit=num)
 
 @client.command(name='8ball',
                 description="Answers a yes/no question.",
@@ -247,7 +251,7 @@ async def emojiWrite(context,word):
 
 @client.event
 async def on_ready():
-    await client.change_presence(activity=Game(name="Ninoh's Tasks"))
+    change_Status.start()
     print("Logged in as " + client.user.name)
     print(client.user.id)
     print('------')
@@ -257,7 +261,6 @@ async def on_message(msg):
     if msg.author == client.user or msg.author.bot:
         return
     contents = msg.content.split(" ")
-    print(contents)
     for word in contents:
         if word.lower() in bannedWords:
             if not msg.author.guild_permissions.administrator:
@@ -279,9 +282,23 @@ async def on_member_join(member):
     embed.set_thumbnail(url="https://i.ytimg.com/vi/ezs7S9a_bNI/maxresdefault.jpg")
     embed.add_field(name="Features", value="I'm here to filter any bad language and keep order in this server.\nI can also generate minesweeper puzzles and play games with you when you are bored.",
                     inline=False)
-    embed.add_field(name="Getting started", value="Since I am a bot, I'm not able to get you up to speed right away.\n Please mention the administrator to get started!"
+    embed.add_field(name="Getting started", value="Since I am a bot, I'm not able to get you up to speed right away.\n Please mention the administrator to get started!."
+                    , inline=False)
+    embed.add_field(name="Once you're in the server",
+                    value="Type !commands to get a list of commands"
                     , inline=False)
     await member.send(embed=embed)
+
+@client.event
+async def on_command_error(ctx,error):
+    if isinstance(error,commands.commandNotFound):
+        await ctx.send("The command does not exist!")
+    elif isinstance(error,commands.MissingRequiredArgument):
+        await ctx.send("Please pass the relevant argument after the command")
+
+@tasks.loop(minutes=10)
+async def change_Status():
+    await client.change_presence(activity=discord.Game(next(statusCycle)))
 
 
 @client.command()
@@ -299,6 +316,11 @@ async def bitcoin(context):
 async def echo(context,*,arg):
     await context.send(arg)
 
+@client.command(name="Ping",
+                description="Tells you your latency to the server",
+                aliases=["ping"])
+async def ping(context):
+    await context.send("Pong! Your latency is: "+str(round(client.latency*1000))+"ms")
 
 @client.command(name="Version",
                 description="Prints version of code",
@@ -358,7 +380,7 @@ async def botInfo(ctx):
     embed.add_field(name="Owner", value="Eimi#8826", inline=True)
     embed.add_field(name="Version", value="1.6.0", inline=True)
     embed.add_field(name="Language", value="Python", inline=True)
-    embed.add_field(name="Commands", value="x number", inline=True)
+    embed.add_field(name="Source", value="https://github.com/Miyamura80/DiscordBot", inline=True)
     embed.add_field(name="Hosting", value="Raspberry Pi 2 B at my house", inline=True)
     await ctx.send(embed=embed)
 
@@ -379,9 +401,6 @@ async def commands(ctx):
     await ctx.send(embed=embed)
 
 
-@client.command()
-async def source(ctx):
-    await ctx.send("https://github.com/Miyamura80/DiscordBot")
 
 
 async def list_servers():
