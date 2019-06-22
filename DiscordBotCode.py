@@ -1,24 +1,10 @@
-
-# @client.event
-# async def on_message(message):
-#     # we do not want the bot to reply to itself
-#     if message.author == client.user:
-#         return
-#
-#     if message.content.startswith('!hello'):
-#         msg = 'Hello {0.author.mention}'.format(message)
-#         await client.send_message(message.channel, msg)
-#woah
-
-
-# Work with Python 3.6
 import random
 import asyncio
 import aiohttp
 import json
 from random import randint
 from discord.ext import commands
-from discord import Game,Member,Embed,Colour
+from discord import Game,Member,Embed,Colour,errors
 from discord.ext.commands import Bot
 import time
 
@@ -40,6 +26,11 @@ CHESSDEFAULT = [["BR","BK","BB","BQ","BG","BB","BK","BR"],
 
 CHESSCODE = {"BR":"♜","BK":"♞","BB":"♝","BQ":"♛","BG":"♚","BP":"♟",
              "WR": "♖", "WK": "♘", "WB": "♗", "WQ": "♕", "WG": "♔", "WP": "♙",'  ':'  □'}
+
+with open("chatFilterList.txt","r") as f:
+    bannedWordsPrepro =f.readlines()
+bannedWords = [word.lower() for word in bannedWordsPrepro]
+
 
 def toUpper(arg):
     return arg.upper()
@@ -129,7 +120,8 @@ async def slap(ctx, *, reason: RandomSlapper):
 
 @client.command(pass_context=True,category="Moderation")
 async def kick(ctx, member: Member,reason="<None Specified>"):
-    if "454184393636839426" in [str(role.id) for role in ctx.author.roles]:
+    # if "454184393636839426" in [str(role.id) for role in ctx.author.roles]:
+    if ctx.message.author.guild_permissions.administrator:
         await ctx.send("**Kicked**: "+str(member.name)+" for: "+reason)
         await member.kick(reason=reason)
     else:
@@ -137,7 +129,8 @@ async def kick(ctx, member: Member,reason="<None Specified>"):
 
 @client.command(pass_context=True,category="Moderation")
 async def ban(ctx, member: Member,reason="<None Specified>"):
-    if "454184393636839426" in [str(role.id) for role in ctx.author.roles]:
+    # if "454184393636839426" in [str(role.id) for role in ctx.author.roles]:
+    if ctx.message.author.guild_permissions.administrator:
         await ctx.send("**Banned**: "+str(member.name)+" for: "+reason)
         await member.ban(reason=reason)
     else:
@@ -145,33 +138,42 @@ async def ban(ctx, member: Member,reason="<None Specified>"):
 
 @client.command(name='banList',
                 brief="Shows a list of banned users",
-                aliases=['bl', 'banlist', 'BanList'],category="Moderation")
+                aliases=['bl', 'banlist', 'BanList'],category="Moderation",pass_context=True)
 async def banList(ctx):
-    banned_users = await ctx.guild.bans()
-    banList = "**Banned Users:**\n"
-    for ban_Entry in banned_users:
-        user = ban_Entry.user
-        banList += user.name + "#" +user.discriminator + "\n"
-    await ctx.send(banList)
+    # if "454184393636839426" in [str(role.id) for role in ctx.author.roles]:
+    if ctx.message.author.guild_permissions.administrator:
+        banned_users = await ctx.guild.bans()
+        banList = "**Banned Users:**\n"
+        for ban_Entry in banned_users:
+            user = ban_Entry.user
+            banList += user.name + "#" +user.discriminator + "\n"
+        await ctx.send(banList)
+    else:
+        await ctx.send("Insufficient permissions")
 
-@client.command(category="Moderation")
+@client.command(category="Moderation",pass_context=True)
 async def unban(ctx,member):
-    banned_users = await ctx.guild.bans()
-    memberName,memberDiscriminator = member.split("#")
-    for ban_entry  in banned_users:
-        user = ban_entry.user
-        if (user.name,user.discriminator) == (memberName,memberDiscriminator):
-            await ctx.guild.unban(user)
-            await ctx.send("**Unbanned user**: {}".format(user.mention))
-            return
+    # if "454184393636839426" in [str(role.id) for role in ctx.author.roles]:
+    if ctx.message.author.guild_permissions.administrator:
+        banned_users = await ctx.guild.bans()
+        memberName,memberDiscriminator = member.split("#")
+        for ban_entry  in banned_users:
+            user = ban_entry.user
+            if (user.name,user.discriminator) == (memberName,memberDiscriminator):
+                await ctx.guild.unban(user)
+                await ctx.send("**Unbanned user**: {}".format(user.mention))
+                return
+    else:
+        await ctx.send("Insufficient permissions")
 
-@client.command(category="Moderation")
+@client.command(category="Moderation",pass_context=True)
 async def clear(ctx,num=100):
-    channel = ctx.guild.channel
-    messages = []
-    async for message in client.logs_from(channel,limit=int(num)):
-        messages.append(message)
-    await client.delete_messages(messages)
+    if ctx.message.author.guild_permissions.administrator:
+        channel = ctx.guild.channel
+        messages = []
+        async for message in client.logs_from(channel,limit=int(num)):
+            messages.append(message)
+        await client.delete_messages(messages)
 
 @client.command(name='8ball',
                 description="Answers a yes/no question.",
@@ -250,6 +252,22 @@ async def on_ready():
     print(client.user.id)
     print('------')
 
+@client.event
+async def on_message(msg):
+    if msg.author == client.user or msg.author.bot:
+        return
+    contents = msg.content.split(" ")
+    print(contents)
+    for word in contents:
+        if word.lower() in bannedWords:
+            if not msg.author.guild_permissions.administrator:
+                try:
+                    await msg.channel.send("That word is banned")
+                    await msg.delete()
+                except errors.notFound:
+                    return
+    await client.process_commands(msg)
+
 
 @client.command()
 async def bitcoin(context):
@@ -288,14 +306,14 @@ async def eito(context):
 async def myRole(context):
     roleList = [str(role.name) for role in context.author.roles][1:]
     if len(roleList)==0:
-        await context.send("You do not have a role")
+        await context.send("You do not have a role" + context.message.author.mention)
     else:
         roles = ""
         for i in range(len(roleList)):
             roles += roleList[i]
             if i!=len(roleList)-1:
                 roles += ", "
-        await context.send(roles)
+        await context.send("You roles are: "+roles+ " "+context.message.author.mention)
 
 @client.command()
 async def showEmbed(ctx):
@@ -313,7 +331,7 @@ async def showEmbed(ctx):
     embed.add_field(name="Field Name", value="Field value", inline=False)
     await ctx.send(embed=embed)
 
-@client.command()
+@client.command(aliases=["botinfo","BotInfo"])
 async def botInfo(ctx):
     embed = Embed(
         title="Lappy",
