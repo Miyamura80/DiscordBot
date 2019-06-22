@@ -169,11 +169,11 @@ async def unban(ctx,member):
 @client.command(category="Moderation",pass_context=True)
 async def clear(ctx,num=100):
     if ctx.message.author.guild_permissions.administrator:
-        channel = ctx.guild.channel
+        channel = ctx.channel
         messages = []
-        async for message in client.logs_from(channel,limit=int(num)):
+        async for message in ctx.logs_from(channel,limit=int(num)):
             messages.append(message)
-        await client.delete_messages(messages)
+        await ctx.delete_messages(messages)
 
 @client.command(name='8ball',
                 description="Answers a yes/no question.",
@@ -268,6 +268,21 @@ async def on_message(msg):
                     return
     await client.process_commands(msg)
 
+@client.event
+async def on_member_join(member):
+    embed = Embed(
+        title="Hello!",
+        description="Hello. My name is Lappy and I am your server management bot!",
+        colour=Colour.from_rgb(32, 244, 0)
+    )
+    embed.set_footer(text="Lappy is a digital construction of Eimi's PC as a bot")
+    embed.set_thumbnail(url="https://i.ytimg.com/vi/ezs7S9a_bNI/maxresdefault.jpg")
+    embed.add_field(name="Features", value="I'm here to filter any bad language and keep order in this server.\nI can also generate minesweeper puzzles and play games with you when you are bored.",
+                    inline=False)
+    embed.add_field(name="Getting started", value="Since I am a bot, I'm not able to get you up to speed right away.\n Please mention the administrator to get started!"
+                    , inline=False)
+    await member.send(embed=embed)
+
 
 @client.command()
 async def bitcoin(context):
@@ -336,7 +351,7 @@ async def botInfo(ctx):
     embed = Embed(
         title="Lappy",
         description="Bot built to manage your server and have fun",
-        colour=Colour.blue()
+        colour=Colour.from_rgb(254,33,98)
     )
     embed.set_footer(text="Lappy is a digital construction of Eimi's PC as a bot")
     embed.set_thumbnail(url="https://i.ytimg.com/vi/ezs7S9a_bNI/maxresdefault.jpg")
