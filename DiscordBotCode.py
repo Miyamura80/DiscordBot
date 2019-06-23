@@ -10,7 +10,6 @@ from itertools import cycle
 import time
 import discord
 
-
 CHESSHELP = ["!c XN>YM: X for column N for row, to column Y row M",
              "!c newgame: start a new game for 2 player",
              "!c ai: start a new game against AI",
@@ -109,6 +108,7 @@ def putNumbers(n,M):
 BOT_PREFIX = ("?", "!")
 
 client = Bot(command_prefix=BOT_PREFIX)
+# discord.opus.load_opus("opus")
 # client.remove_command("help")
 
 
@@ -289,12 +289,12 @@ async def on_member_join(member):
                     , inline=False)
     await member.send(embed=embed)
 
-@client.event
-async def on_command_error(ctx,error):
-    if isinstance(error,commands.commandNotFound):
-        await ctx.send("The command does not exist!")
-    elif isinstance(error,commands.MissingRequiredArgument):
-        await ctx.send("Please pass the relevant argument after the command")
+# @client.event
+# async def on_command_error(ctx,error):
+#     if isinstance(error,discord.commandNotFound):
+#         await ctx.send("The command does not exist!")
+#     elif isinstance(error,discord.MissingRequiredArgument):
+#         await ctx.send("Please pass the relevant argument after the command")
 
 @tasks.loop(minutes=10)
 async def change_Status():
@@ -400,8 +400,18 @@ async def commands(ctx):
     embed.add_field(name="➤Settings", value="None atm", inline=True)
     await ctx.send(embed=embed)
 
+@client.command(pass_context=True)
+async def join(ctx):
+    channel=ctx.message.author.voice.channel
+    if channel is None:
+        await ctx.send("You are not in a voice channel")
+        return
+    await channel.connect()
 
-
+@client.command(pass_context=True)
+async def leave(ctx):
+    guild = ctx.message.guild
+    state = client.voice_client_in(guild)
 
 async def list_servers():
     await client.wait_until_ready()
