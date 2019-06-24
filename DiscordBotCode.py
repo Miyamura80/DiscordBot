@@ -9,6 +9,7 @@ from discord.ext.commands import Bot
 from itertools import cycle
 import time
 import discord
+import youtube_dl
 
 CHESSHELP = ["!c XN>YM: X for column N for row, to column Y row M",
              "!c newgame: start a new game for 2 player",
@@ -28,6 +29,51 @@ CHESSDEFAULT = [["BR","BK","BB","BQ","BG","BB","BK","BR"],
 
 CHESSCODE = {"BR":"♜","BK":"♞","BB":"♝","BQ":"♛","BG":"♚","BP":"♟",
              "WR": "♖", "WK": "♘", "WB": "♗", "WQ": "♕", "WG": "♔", "WP": "♙",'  ':'  □'}
+
+# Suppress noise about console usage from errors
+youtube_dl.utils.bug_reports_message = lambda: ''
+
+
+ytdl_format_options = {
+    'format': 'bestaudio/best',
+    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
+    'restrictfilenames': True,
+    'noplaylist': True,
+    'nocheckcertificate': True,
+    'ignoreerrors': False,
+    'logtostderr': False,
+    'quiet': True,
+    'no_warnings': True,
+    'default_search': 'auto',
+    'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
+}
+
+ffmpeg_options = {
+    'options': '-vn'
+}
+
+ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
+
+class YTDLSource(discord.PCMVolumeTransformer):
+    def __init__(self, source, *, data, volume=0.5):
+        super().__init__(source, volume)
+
+        self.data = data
+
+        self.title = data.get('title')
+        self.url = data.get('url')
+
+    @classmethod
+    async def from_url(cls, url, *, loop=None, stream=False):
+        loop = loop or asyncio.get_event_loop()
+        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
+
+        if 'entries' in data:
+            # take first item from a playlist
+            data = data['entries'][0]
+
+        filename = data['url'] if stream else ytdl.prepare_filename(data)
+        return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 with open("chatFilterList.txt","r") as f:
     bannedWordsPrepro =f.readlines()
@@ -105,19 +151,86 @@ def putNumbers(n,M):
 
 
 
-BOT_PREFIX = ("?", "!")
-
-client = Bot(command_prefix=BOT_PREFIX)
-# discord.opus.load_opus("opus")
-# client.remove_command("help")
-
-
-
 class RandomSlapper(commands.Converter):
     async def convert(self, ctx, argument):
         to_slap = random.choice(ctx.guild.members)
         return '@{0.author} slapped @{1} because *{2}*'.format(ctx, to_slap, argument)
 
+
+class Music(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @commands.command()
+    async def play(self, ctx, *, query):
+        """Plays a file from the local filesystem"""
+
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(query))
+        ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
+
+        await ctx.send('Now playing: {}'.format(query))
+
+    @commands.command()
+    async def yt(self, ctx, *, url):
+        """Plays from a url (almost anything youtube_dl supports)"""
+
+        async with ctx.typing():
+            player = await YTDLSource.from_url(url, loop=self.bot.loop)
+            ctx.voice_client.play(player, after=lambda e: print('Player error: %s' % e) if e else None)
+
+        await ctx.send('Now playing: {}'.format(player.title))
+
+    @commands.command()
+    async def stream(self, ctx, *, url):
+        """Streams from a url (same as yt, but doesn't predownload)"""
+
+        async with ctx.typing():
+            player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
+            ctx.voice_client.play(player, after=lambda e: print('Player error: %s' % e) if e else None)
+
+        await ctx.send('Now playing: {}'.format(player.title))
+
+    @commands.command()
+    async def volume(self, ctx, volume: int):
+        """Changes the player's volume"""
+
+        if ctx.voice_client is None:
+            return await ctx.send("Not connected to a voice channel.")
+
+        ctx.voice_client.source.volume = volume / 100
+        await ctx.send("Changed volume to {}%".format(volume))
+
+    @commands.command()
+    async def stop(self, ctx):
+        """Stops and disconnects the bot from voice"""
+
+        await ctx.voice_client.disconnect()
+
+    @play.before_invoke
+    @yt.before_invoke
+    @stream.before_invoke
+    async def ensure_voice(self, ctx):
+        if ctx.voice_client is None:
+            if ctx.author.voice:
+                await ctx.author.voice.channel.connect()
+            else:
+                await ctx.send("You are not connected to a voice channel.")
+                raise commands.CommandError("Author not connected to a voice channel.")
+        elif ctx.voice_client.is_playing():
+            ctx.voice_client.stop()
+
+async def list_servers():
+    await client.wait_until_ready()
+    while not client.is_closed:
+        print("Current servers:")
+        for server in client.servers:
+            print(server.name)
+        await asyncio.sleep(600)
+
+BOT_PREFIX = ("?", "!")
+
+client = Bot(command_prefix=BOT_PREFIX)
+# client.remove_command("help")
 
 @client.command()
 async def slap(ctx, *, reason: RandomSlapper):
@@ -324,7 +437,7 @@ async def ping(context):
 
 @client.command(name="Version",
                 description="Prints version of code",
-                aliases=["v","ver","version"])
+                aliases=["ver","version"])
 async def version(context):
     await context.send("Version Number: v.1.0.2")
 
@@ -400,32 +513,19 @@ async def commands(ctx):
     embed.add_field(name="➤Settings", value="None atm", inline=True)
     await ctx.send(embed=embed)
 
-@client.command(pass_context=True)
+@client.command()
 async def join(ctx):
-    channel=ctx.message.author.voice.channel
+    """Joins a voice channel"""
+    channel = ctx.message.author.voice.channel
     if channel is None:
         await ctx.send("You are not in a voice channel")
         return
     await channel.connect()
-
-@client.command(pass_context=True)
-async def leave(ctx):
-    guild = ctx.message.guild
-    state = client.voice_client_in(guild)
-
-async def list_servers():
-    await client.wait_until_ready()
-    while not client.is_closed:
-        print("Current servers:")
-        for server in client.servers:
-            print(server.name)
-        await asyncio.sleep(600)
-
-
 
 client.loop.create_task(list_servers())
 
 f = open("token.txt","r")
 token = f.read()
 f.close()
+client.add_cog(Music(client))
 client.run(token)
