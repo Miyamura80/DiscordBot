@@ -182,6 +182,7 @@ class Music(commands.Cog):
 
     @commands.command()
     async def stream(self, ctx, *, url):
+        beforeArgs = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
         """Streams from a url (same as yt, but doesn't predownload)"""
 
         async with ctx.typing():
