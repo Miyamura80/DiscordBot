@@ -34,35 +34,19 @@ CHESSCODE = {"BR":"♜","BK":"♞","BB":"♝","BQ":"♛","BG":"♚","BP":"♟",
 # Suppress noise about console usage from errors
 youtube_dl.utils.bug_reports_message = lambda: ''
 
-class MyLogger(object):
-    def debug(self, msg):
-        pass
-
-    def warning(self, msg):
-        pass
-
-    def error(self, msg):
-        print(msg)
-
-
-def my_hook(d):
-    if d['status'] == 'finished':
-        print('Done downloading, now converting ...')
 
 ytdl_format_options = {
     'format': 'bestaudio/best',
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
-    }],
-    'logger': MyLogger(),
-    'progress_hooks': [my_hook],
-    'default_search': 'ytsearch',
+    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
+    'restrictfilenames': True,
     'noplaylist': True,
-    "forcethumbnail": True,
-    "writethumbnail": True,
-
+    'nocheckcertificate': True,
+    'ignoreerrors': False,
+    'logtostderr': False,
+    'quiet': True,
+    'no_warnings': True,
+    'default_search': 'auto',
+    'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
 }
 
 ffmpeg_options = {
@@ -70,6 +54,57 @@ ffmpeg_options = {
 }
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
+
+class MusicPlayer:
+    def __init__(self,ctx):
+        self.bot = ctx.bot
+        self.guild = ctx.guild
+        self.channel = ctx.channel
+        self._cog = ctx.cog
+
+        self.queue = asyncio.Queue()
+        self.next = asyncio.Event()
+
+        self.now_playing = None
+        self.volume = 0.5
+        self.current = None
+    async def player_loop(self):
+        await self.bot.wait_until_ready()
+
+        while not self.bot.is_closed():
+            self.next.clear()
+            try:
+                async with timeout(300):
+                    source = await self.queue.get()
+            except asyncio.TimeoutError:
+                return self.destroy(self.guild)
+            if not isinstance(source,YTDLSource):
+                try:
+                    source = await YTDLSource.regather_stream(source,loop=self.bot.loop)
+                except Exception as e:
+                    await self.channel.send("There was an error processing your song. \n {}".format(e))
+                    continue
+            source.volume = self.volume
+            self.current = source
+
+            self._guild.voice_client.play(source, after=lambda _: self.bot.loop.call_soon_threadsafe(self.next.set))
+            self.np = await self._channel.send(f'**Now Playing:** `{source.title}` requested by '
+                                               f'`{source.requester}`')
+            await self.next.wait()
+
+            # Make sure the FFmpeg process is cleaned up.
+            source.cleanup()
+            self.current = None
+
+            try:
+                # We are no longer playing this song...
+                await self.np.delete()
+            except discord.HTTPException:
+                pass
+
+    def destroy(self,guild):
+        self.bot.loop.create_task(self._cog.cleanup(guild))
+
 
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
@@ -93,11 +128,12 @@ class YTDLSource(discord.PCMVolumeTransformer):
         filename = data['url'] if stream else ytdl.prepare_filename(data)
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
-
-
+with open("chatFilterList.txt","r") as f:
+    bannedWordsPrepro =f.readlines()
+bannedWords = [word.lower() for word in bannedWordsPrepro]
 
 statusCycle = cycle(["with Ninoh's tasks","with server managament",
-                     "with minesweeper puzzles","Echo","Music"
+                     "with minesweeper puzzles","Echo","Music players"
                      ,"Your soul"])
 
 
@@ -173,103 +209,43 @@ class RandomSlapper(commands.Converter):
         to_slap = random.choice(ctx.guild.members)
         return '@{0.author} slapped @{1} because *{2}*'.format(ctx, to_slap, argument)
 
-#CLASS ISN'T USED
-class MusicPlayer:
-    def __init__(self,ctx):
-        self.bot = ctx.bot
-        self.guild = ctx.guild
-        self.channel = ctx.channel
-        self._cog  = ctx.cog
-
-        self.queue = asyncio.Queue()
-        self.next = asyncio.Event()
-
-        self.now_playing = None
-        self.volume = 0.5
-        self.current = None
-
-    async def player_loop(self):
-        await self.bot.wait_until_ready()
-
-        while not self.bot.is_closed():
-            self.next.clear()
-            try:
-                async with timeout(300):
-                    source = await self.queue.get()
-            except asyncio.TimeoutError:
-                return self.destroy(self.guild)
-            if not isinstance(source,YTDLSource):
-                try:
-                    source = await YTDLSource.regather_stream(source,loop=self.bot.loop)
-                except Exception as e:
-                    await self.channel.send("There was an error processing your song. \n {}".format(e))
-                    continue
-            source.volume = self.volume
-            self.current = source
-
-            self._guild.voice_client.play(source, after=lambda _: self.bot.loop.call_soon_threadsafe(self.next.set))
-            self.np = await self._channel.send(f'**Now Playing:** `{source.title}` requested by '
-                                               f'`{source.requester}`')
-            await self.next.wait()
-
-            # Make sure the FFmpeg process is cleaned up.
-            source.cleanup()
-            self.current = None
-
-            try:
-                # We are no longer playing this song...
-                await self.np.delete()
-            except discord.HTTPException:
-                pass
-
-    def destroy(self,guild):
-        self.bot.loop.create_task(self._cog.cleanup(guild))
 
 class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.players = {}
+        #TODO: WORKING FROM HERE
 
-    async def cleanup(self,guild):
-        try:
-            await guild.voice_client.disconnect()
-        except AttributeError:
-            pass
+    @commands.command()
+    async def play(self, ctx, *, query):
+        """Plays a file from the local filesystem"""
 
-        try:
-            del self.players[guild.id]
-        except KeyError:
-            pass
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(query))
+        ctx.voice_client.play(source, after=lambda e: print('Player error: %s' % e) if e else None)
 
-    def get_player(self,ctx):
-        try:
-            player = self.players[ctx.guild.id]
-        except KeyError:
-            pass
+        await ctx.send('Now playing: {}'.format(query))
 
-    @commands.command(aliases=["play","yt"])
+    @commands.command()
+    async def yt(self, ctx, *, url):
+        """Plays from a url (almost anything youtube_dl supports)"""
+
+        async with ctx.typing():
+            player = await YTDLSource.from_url(url, loop=self.bot.loop)
+            ctx.voice_client.play(player, after=lambda e: print('Player error: %s' % e) if e else None)
+
+        await ctx.send('Now playing: {}'.format(player.title))
+
+    @commands.command()
     async def stream(self, ctx, *, url):
         """Streams from a url (same as yt, but doesn't predownload)"""
+
         async with ctx.typing():
-            MusicPlayer = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
-            guildName = ctx.guild
-            authorName = ctx.author
+            player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
+            ctx.voice_client.play(player, after=lambda e: print('Player error: %s' % e) if e else None)
 
-            ctx.voice_client.play(MusicPlayer, after=lambda e: print('Player error: %s' % e) if e else None)
+        await ctx.send('Now playing: {}'.format(player.title))
 
-        embed = Embed(
-            title="**Now playing:** {}".format(MusicPlayer.title),
-            description="**Requested by:** {0} \n **Server:** {1}".format(authorName.mention,guildName),
-            colour=Colour.blue()
-
-        )
-        embed.set_thumbnail(url=MusicPlayer.thumbnail)
-        #Add url of music video
-        # embed.add_field(name="URL:", value=MusicPlayer.url, inline=True)
-        await ctx.send(embed=embed)
-
-
-    @commands.command(aliases=["v"])
+    @commands.command()
     async def volume(self, ctx, volume: int):
         """Changes the player's volume"""
 
@@ -285,49 +261,15 @@ class Music(commands.Cog):
 
         await ctx.voice_client.disconnect()
 
-
-    @commands.command()
-    async def pause(self,ctx):
-        vc = ctx.voice_client
-        if not vc or not vc.is_playing():
-            return await ctx.send("Currently not playing anything!",delete_after=20)
-        elif vc.is_paused():
-            return
-        vc.pause()
-        await ctx.send("{} paused the song".format(ctx.author))
-
-    @commands.command()
-    async def resume(self, ctx):
-        vc = ctx.voice_client
-        if not vc or not vc.is_playing():
-            return await ctx.send("Currently not playing anything!", delete_after=20)
-        elif not vc.is_paused():
-            return
-        vc.resume()
-        await ctx.send("{} resumed the song".format(ctx.author),delete_after=20)
-
-    @commands.command()
-    async def skip(self,ctx):
-        vc = ctx.voice_client
-        if not vc or not vc.is_connected():
-            return await ctx.send("Currently not playing anything!", delete_after=20)
-
-        if vc.is_paused():
-            pass
-        elif not vc.is_playing():
-            return
-
-        vc.stop()
-        await ctx.send("{} skipped the song".format(ctx.author))
-
-
+    @play.before_invoke
+    @yt.before_invoke
     @stream.before_invoke
     async def ensure_voice(self, ctx):
         if ctx.voice_client is None:
             if ctx.author.voice:
                 await ctx.author.voice.channel.connect()
             else:
-                await ctx.send("You are not connected to a voice channel.",delete_after=20)
+                await ctx.send("You are not connected to a voice channel.")
                 raise commands.CommandError("Author not connected to a voice channel.")
         elif ctx.voice_client.is_playing():
             ctx.voice_client.stop()
@@ -367,7 +309,7 @@ async def ban(ctx, member: Member,reason="<None Specified>"):
         await ctx.send("**Banned**: "+str(member.name)+" for: "+reason)
         await member.ban(reason=reason)
     else:
-        await ctx.send("Insufficient permissions",delete_after=20)
+        await ctx.send("Insufficient permissions")
 
 @client.command(name='banList',
                 brief="Shows a list of banned users",
@@ -382,7 +324,7 @@ async def banList(ctx):
             banList += user.name + "#" +user.discriminator + "\n"
         await ctx.send(banList)
     else:
-        await ctx.send("Insufficient permissions",delete_after=20)
+        await ctx.send("Insufficient permissions")
 
 @client.command(category="Moderation",pass_context=True)
 async def unban(ctx,member):
@@ -397,7 +339,7 @@ async def unban(ctx,member):
                 await ctx.send("**Unbanned user**: {}".format(user.mention))
                 return
     else:
-        await ctx.send("Insufficient permissions",delete_after=20)
+        await ctx.send("Insufficient permissions")
 
 @client.command(category="Moderation",pass_context=True)
 async def clear(ctx,num=5):
@@ -464,28 +406,14 @@ async def chess(context,arg: toUpper):
 @client.command(name="EmojiWrite",
                 description="Prints out words",
                 aliases=["emojiWrite","regIn","emw"])
-async def emojiWrite(context,*,word):
-    nums = ["1","2","3","4","5","6","7","8","9","0"]
-    numToChar = {"1": ":one: " ,
-                 "2": ":two: ",
-                 "3": ":three:",
-                 "4": ":four:",
-                 "5": ":five:",
-                 "6": ":six:",
-                 "7": ":seven:",
-                 "8": ":eight:",
-                 "9": ":nine:",
-                 "0": ":zero:"}
+async def emojiWrite(context,word):
     word = word.lower().replace("_"," ")
     output = ""
     for letter in word:
         if letter==" ":
             output +=":black_medium_small_square:"
         else:
-            if letter in nums:
-                output += numToChar[letter]
-            else:
-                output += ":regional_indicator_" + letter + ": "
+            output += ":regional_indicator_" + letter + ": "
     await context.send(output)
 
 
@@ -501,9 +429,6 @@ async def on_message(msg):
     if msg.author == client.user or msg.author.bot:
         return
     contents = msg.content.split(" ")
-    with open("chatFilterList.txt", "r") as f:
-        bannedWordsPrepro = f.readlines()
-    bannedWords = [word.lower() for word in bannedWordsPrepro]
     for word in contents:
         if word.lower() in bannedWords:
             if not msg.author.guild_permissions.administrator:
@@ -558,17 +483,6 @@ async def bitcoin(context):
                 aliases=["e","E","echo"])
 async def echo(context,*,arg):
     await context.send(arg)
-
-@client.command(name="filterList",description="Lists the words that are filtered by the bot",
-                aliases=["fList","filterlist","FilterList"])
-async def chatFilterList(ctx):
-    with open("chatFilterList.txt", "r") as f:
-        bannedWordsPrepro = f.readlines()
-    bannedWords = [word.lower() for word in bannedWordsPrepro]
-    result = ""
-    for word in bannedWords:
-        result += word+"\n"
-    await ctx.send(result)
 
 @client.command(name="Ping",
                 description="Tells you your latency to the server",
@@ -659,7 +573,7 @@ async def join(ctx):
     """Joins a voice channel"""
     channel = ctx.message.author.voice.channel
     if channel is None:
-        await ctx.send("You are not in a voice channel",delete_after=20)
+        await ctx.send("You are not in a voice channel")
         return
     await channel.connect()
 
