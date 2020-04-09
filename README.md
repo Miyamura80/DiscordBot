@@ -2,6 +2,10 @@
 
 Here to try the github features and develop the minesweeper bot between my laptop and raspberry pi.
 
+**Requirements:**
+
+You must have ffmpeg installed on the computer to run the bot.
+
 **Token.txt:**
 
 You must have a text file named: "token.txt" in the same folder as the repository, with your
