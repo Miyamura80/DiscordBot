@@ -4,7 +4,7 @@ Here to try the github features and develop the minesweeper bot between my lapto
 
 **Requirements:**
 
-You must have ffmpeg installed on the computer to run the bot.
+You must have ffmpeg installed on the computer to run the bot, and added to environment path. 
 
 **Token.txt:**
 
